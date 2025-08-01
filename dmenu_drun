@@ -1,0 +1,47 @@
+#!/bin/bash
+
+DESKTOP_DIRS="/usr/share/applications /usr/local/share/applications $HOME/.local/share/applications"
+
+CATEGORIES=(
+  "All"
+  "AudioVideo"
+  "Development"
+  "Education"
+  "Game"
+  "Graphics"
+  "Network"
+  "Office"
+  "Science"
+  "Settings"
+  "System"
+  "Utility"
+)
+
+
+while true; do
+  category=$(printf "%s\n" "${CATEGORIES[@]}" | dmenu "$@" -c -i -l 10)
+  [ "$category" == "" ] && exit 1
+
+    while true; do
+    if [ "$category" == "All" ]; then
+        name=$(grep -H -R '^Name=' $DESKTOP_DIRS 2>/dev/null | \
+        cut -d ':' -f1 | xargs -I {} grep -m 1 '^Name=' {} | cut -d '=' -f2 | \
+        sort | uniq | grep -v '^$' | dmenu "$@" -c -i -l 10)
+    else
+        name=$(grep -H -R "^Categories=.*$category" $DESKTOP_DIRS 2>/dev/null | \
+        cut -d ':' -f1 | xargs -I {} grep -m 1 '^Name=' {} | cut -d '=' -f2 | \
+        sort | uniq | grep -v '^$' | dmenu "$@" -c -i -l 10)
+    fi
+
+    [ "$name" == "" ] && break
+
+    exec_cmd=$(grep -H -R -m 1 "^Name=${name}$" $DESKTOP_DIRS 2>/dev/null | \
+        cut -d ':' -f1 | xargs -I {} grep -m1 '^Exec=' {} | \
+        cut -d '=' -f2 | cut -d '%' -f1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -1)
+
+    [ "$exec_cmd" == "" ] && continue
+
+    nohup $exec_cmd >/dev/null 2>&1 &
+    exit 0
+    done
+done

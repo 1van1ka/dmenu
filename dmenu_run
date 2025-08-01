@@ -1,0 +1,14 @@
+#!/bin/bash
+bin=` \
+  (dmenu_path) | \
+  sort -r | \
+  uniq -c | \
+  awk '{printf("%d %s\n", $1 * 1000000 + NR, $2)}' | \
+  sort -n -r | \
+  awk '{print $NF}' | \
+  dmenu "$@"`
+if [ "$bin" == "" ]; then
+  exit 1
+fi
+echo $bin | ${SHELL:-"/bin/sh"} &
+exit 0
