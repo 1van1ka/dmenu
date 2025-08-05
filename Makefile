@@ -1,66 +1,59 @@
-# dmenu - dynamic menu
-# See LICENSE file for copyright and license details.
+include config/config.mk
 
-include config.mk
+SRC_DIR   = src
+OBJ_DIR   = build
+INC_DIR   = include
+SCRIPT_DIR = scripts
+MAN_DIR   = man
 
-SRC = drw.c dmenu.c stest.c util.c
-OBJ = $(SRC:.c=.o)
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+OBJS = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 
-all: options dmenu stest
+BINARIES = dmenu stest
 
-options:
-	@echo dmenu build options:
-	@echo "CFLAGS   = $(CFLAGS)"
-	@echo "LDFLAGS  = $(LDFLAGS)"
-	@echo "CC       = $(CC)"
+all: $(OBJ_DIR)/dmenu $(OBJ_DIR)/stest
 
-.c.o:
-	$(CC) -c $(CFLAGS) $<
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
 
-config.h:
-	cp config.def.h $@
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+	$(CC) -I$(INC_DIR) -c $(CFLAGS) $< -o $@
 
-$(OBJ): arg.h config.h config.mk drw.h
+$(OBJ_DIR)/dmenu: $(OBJ_DIR)/dmenu.o $(OBJ_DIR)/drw.o $(OBJ_DIR)/util.o
+	$(CC) -o $@ $^ $(LDFLAGS)
 
-dmenu: dmenu.o drw.o util.o
-	$(CC) -o $@ dmenu.o drw.o util.o $(LDFLAGS)
-
-stest: stest.o
-	$(CC) -o $@ stest.o $(LDFLAGS)
+$(OBJ_DIR)/stest: $(OBJ_DIR)/stest.o
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -f dmenu stest $(OBJ) dmenu-$(VERSION).tar.gz *.rej *.orig
+	rm -f $(OBJ_DIR)/*.o $(OBJ_DIR)/dmenu $(OBJ_DIR)/stest dmenu-$(VERSION).tar.gz *.rej *.orig
 
 dist: clean
 	mkdir -p dmenu-$(VERSION)
-	cp LICENSE Makefile README arg.h config.def.h config.mk dmenu.1\
-		drw.h util.h dmenu_path dmenu_run dmenu_drun stest.1 $(SRC)\
-		dmenu-$(VERSION)
+	cp -r LICENSE Makefile README config config.mk $(MAN_DIR) $(INC_DIR) $(SCRIPT_DIR) $(SRC_DIR) dmenu-$(VERSION)
 	tar -cf dmenu-$(VERSION).tar dmenu-$(VERSION)
 	gzip dmenu-$(VERSION).tar
 	rm -rf dmenu-$(VERSION)
 
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
-	cp -f dmenu dmenu_path dmenu_run dmenu_drun stest $(DESTDIR)$(PREFIX)/bin
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu_path
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu_run
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu_drun
+	cp -f $(OBJ_DIR)/dmenu $(OBJ_DIR)/stest $(SCRIPT_DIR)/dmenu_* $(DESTDIR)$(PREFIX)/bin
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu*
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/stest
 	mkdir -p $(DESTDIR)$(MANPREFIX)/man1
-	sed "s/VERSION/$(VERSION)/g" < dmenu.1 > $(DESTDIR)$(MANPREFIX)/man1/dmenu.1
-	sed "s/VERSION/$(VERSION)/g" < stest.1 > $(DESTDIR)$(MANPREFIX)/man1/stest.1
-	chmod 644 $(DESTDIR)$(MANPREFIX)/man1/dmenu.1
-	chmod 644 $(DESTDIR)$(MANPREFIX)/man1/stest.1
+	sed "s/VERSION/$(VERSION)/g" < $(MAN_DIR)/dmenu.1 > $(DESTDIR)$(MANPREFIX)/man1/dmenu.1
+	sed "s/VERSION/$(VERSION)/g" < $(MAN_DIR)/stest.1 > $(DESTDIR)$(MANPREFIX)/man1/stest.1
+	chmod 644 $(DESTDIR)$(MANPREFIX)/man1/*.1
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/dmenu\
-		$(DESTDIR)$(PREFIX)/bin/dmenu_path\
-		$(DESTDIR)$(PREFIX)/bin/dmenu_run\
-		$(DESTDIR)$(PREFIX)/bin/dmenu_drun\
-		$(DESTDIR)$(PREFIX)/bin/stest\
-		$(DESTDIR)$(MANPREFIX)/man1/dmenu.1\
+	rm -f $(DESTDIR)$(PREFIX)/bin/dmenu \
+		$(DESTDIR)$(PREFIX)/bin/dmenu_path \
+		$(DESTDIR)$(PREFIX)/bin/dmenu_run \
+		$(DESTDIR)$(PREFIX)/bin/dmenu_drun \
+		$(DESTDIR)$(PREFIX)/bin/stest \
+		$(DESTDIR)$(MANPREFIX)/man1/dmenu.1 \
 		$(DESTDIR)$(MANPREFIX)/man1/stest.1
 
-.PHONY: all options clean dist install uninstall
+$(OBJS): $(INC_DIR)/arg.h $(INC_DIR)/config.h $(INC_DIR)/drw.h $(INC_DIR)/util.h
+
+.PHONY: all clean dist install uninstall

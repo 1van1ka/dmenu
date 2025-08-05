@@ -1,3 +1,14 @@
+#include <stdio.h>
+#define OPAQUE 0xFFU
+
+enum {
+  SchemeSep,
+  SchemeNorm,
+  SchemeSel,
+  SchemeOut,
+  SchemeLast
+};
+
 static int topbar                        = 1;     /* -b  option; if 0, dmenu appears at bottom     */
 static int centered                      = 0;     /* -c option; centers dmenu on screen */
 static unsigned int min_width            = 600;   /* -mw option; minimum width when centered */

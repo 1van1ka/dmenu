@@ -10,14 +10,13 @@
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#ifdef XINERAMA
 #include <X11/extensions/Xinerama.h>
-#endif
 #include <X11/Xft/Xft.h>
 #include <X11/Xresource.h>
 
-#include "drw.h"
-#include "util.h"
+#include "../include/config.h"
+#include "../include/drw.h"
+#include "../include/util.h"
 
 /* macros */
 #define INTERSECT(x, y, w, h, r)                                               \
@@ -25,18 +24,6 @@
    MAX(0, MIN((y) + (h), (r).y_org + (r).height) - MAX((y), (r).y_org)))
 #define LENGTH(X) (sizeof X / sizeof X[0])
 #define TEXTW(X) (drw_fontset_getwidth(drw, (X)) + lrpad)
-
-/* define opaqueness */
-#define OPAQUE 0xFFU
-
-/* enums */
-enum {
-  SchemeSep,
-  SchemeNorm,
-  SchemeSel,
-  SchemeOut,
-  SchemeLast
-}; /* color schemes */
 
 struct item {
   char *text;
@@ -68,8 +55,6 @@ static Visual *visual;
 static int depth;
 static Colormap cmap;
 static Clr *scheme[SchemeLast];
-
-#include "config.h"
 
 static int (*fstrncmp)(const char *, const char *, size_t) = strncmp;
 static char *(*fstrstr)(const char *, const char *) = strstr;
