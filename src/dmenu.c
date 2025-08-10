@@ -1,3 +1,4 @@
+/* See LICENSE file for copyright and license details. */
 #include <ctype.h>
 #include <locale.h>
 #include <stdio.h>
@@ -10,12 +11,14 @@
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#ifdef XINERAMA
 #include <X11/extensions/Xinerama.h>
+#endif
 #include <X11/Xft/Xft.h>
 #include <X11/Xresource.h>
 
-#include "../include/config.h"
 #include "../include/drw.h"
+#include "../include/config.h"
 #include "../include/util.h"
 
 /* macros */
@@ -55,6 +58,7 @@ static Visual *visual;
 static int depth;
 static Colormap cmap;
 static Clr *scheme[SchemeLast];
+
 
 static int (*fstrncmp)(const char *, const char *, size_t) = strncmp;
 static char *(*fstrstr)(const char *, const char *) = strstr;
@@ -218,7 +222,7 @@ static void drawmenu(void) {
 }
 
 static void grabfocus(void) {
-  struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000000};
+  struct timespec ts = {.tv_sec = 0, .tv_nsec = 1000};
   Window focuswin;
   int i, revertwin;
 
@@ -587,105 +591,94 @@ static void buttonpress(XEvent *e) {
   if (ev->window != win)
     return;
 
-  /* right-click: exit */
-  if (ev->button == Button3)
+  if (ev->button == Button3) {
     exit(1);
-
-  if (prompt && *prompt)
-    x += promptw;
-
-  /* input field */
-  w = (lines > 0 || !matches) ? mw - x : inputw;
-
-  /* left-click on input: clear input,
-   * NOTE: if there is no left-arrow the space for < is reserved so
-   *       add that to the input width */
-  if (ev->button == Button1 &&
-      ((lines <= 0 && ev->x >= 0 &&
-        ev->x <= x + w + ((!prev || !curr->left) ? TEXTW("<") : 0)) ||
-       (lines > 0 && ev->y >= y && ev->y <= y + h))) {
-    insert(NULL, -cursor);
-    drawmenu();
-    return;
   }
-  /* middle-mouse click: paste selection */
+
   if (ev->button == Button2) {
     XConvertSelection(dpy, (ev->state & ShiftMask) ? clip : XA_PRIMARY, utf8,
                       utf8, win, CurrentTime);
     drawmenu();
     return;
   }
-  /* scroll up */
+
   if (ev->button == Button4 && prev) {
     sel = curr = prev;
     calcoffsets();
     drawmenu();
     return;
   }
-  /* scroll down */
   if (ev->button == Button5 && next) {
     sel = curr = next;
     calcoffsets();
     drawmenu();
     return;
   }
-  if (ev->button != Button1)
-    return;
-  if (ev->state & ~ControlMask)
-    return;
-  if (lines > 0) {
-    /* vertical list: (ctrl)left-click on item */
-    w = mw - x;
-    for (item = curr; item != next; item = item->right) {
-      y += h;
-      if (ev->y >= y && ev->y <= (y + h)) {
-        puts(item->text);
-        if (!(ev->state & ControlMask))
-          exit(0);
-        sel = item;
-        if (sel) {
-          sel->out = 1;
-          drawmenu();
-        }
-        return;
-      }
+
+  if (ev->button == Button1) {
+    if (prompt && *prompt)
+      x += promptw;
+
+    w = (lines > 0 || !matches) ? mw - x : inputw;
+
+    if ((lines <= 0 && ev->x >= 0 &&
+         ev->x <= x + w + ((!prev || !curr->left) ? TEXTW("<") : 0)) ||
+        (lines > 0 && ev->y >= y && ev->y <= y + h)) {
+      insert(NULL, -cursor);
+      drawmenu();
+      return;
     }
-  } else if (matches) {
-    /* left-click on left arrow */
-    x += inputw;
-    w = TEXTW("<");
-    if (prev && curr->left) {
-      if (ev->x >= x && ev->x <= x + w) {
+
+    if (lines > 0) {
+      w = mw - x;
+      for (item = curr; item != next; item = item->right) {
+        y += h;
+        if (ev->y >= y && ev->y <= (y + h)) {
+          puts(item->text);
+          if (!(ev->state & ControlMask))
+            exit(0);
+          sel = item;
+          if (sel) {
+            sel->out = 1;
+            drawmenu();
+          }
+          return;
+        }
+      }
+    } else if (matches) {
+      x += inputw;
+      w = TEXTW("<");
+      if (prev && curr->left && ev->x >= x && ev->x <= x + w) {
         sel = curr = prev;
         calcoffsets();
         drawmenu();
         return;
       }
-    }
-    /* horizontal list: (ctrl)left-click on item */
-    for (item = curr; item != next; item = item->right) {
-      x += w;
-      w = MIN(TEXTW(item->text), mw - x - TEXTW(">"));
-      if (ev->x >= x && ev->x <= x + w) {
-        puts(item->text);
-        if (!(ev->state & ControlMask))
-          exit(0);
-        sel = item;
-        if (sel) {
-          sel->out = 1;
-          drawmenu();
+
+      for (item = curr; item != next; item = item->right) {
+        x += w;
+        w = MIN(TEXTW(item->text), mw - x - TEXTW(">"));
+        if (ev->x >= x && ev->x <= x + w) {
+          puts(item->text);
+          if (!(ev->state & ControlMask))
+            exit(0);
+          sel = item;
+          if (sel) {
+            sel->out = 1;
+            drawmenu();
+          }
+          return;
         }
+      }
+
+      w = TEXTW(">");
+      x = mw - w;
+      if (next && ev->x >= x && ev->x <= x + w) {
+        sel = curr = next;
+        calcoffsets();
+        drawmenu();
         return;
       }
-    }
-    /* left-click on right arrow */
-    w = TEXTW(">");
-    x = mw - w;
-    if (next && ev->x >= x && ev->x <= x + w) {
-      sel = curr = next;
-      calcoffsets();
-      drawmenu();
-      return;
     }
   }
 }
@@ -828,8 +821,9 @@ static void setup(void) {
           break;
 
     if (centered) {
-      mw = MIN(MAX(max_textw() + promptw, MAX(min_width, width_input)),
-               info[i].width);
+      if (width_input == 0 && width_input < info[i].width)
+        width_input = info[i].width;
+      mw = MIN(MAX(max_textw() + promptw, min_width), width_input);
       x = info[i].x_org + ((info[i].width - mw) / 2);
       y = info[i].y_org + (info[i].height * height_ratio);
     } else {
@@ -917,6 +911,37 @@ void read_Xresources(void) {
   }
 }
 
+int is_dmenu_running(Display *dpy) {
+  Window root = DefaultRootWindow(dpy);
+  Window parent, *children;
+  unsigned int nchildren;
+  int i;
+
+  if (!XQueryTree(dpy, root, &root, &parent, &children, &nchildren))
+    return 0;
+
+  for (i = 0; i < nchildren; i++) {
+    XClassHint class_hint;
+    if (XGetClassHint(dpy, children[i], &class_hint)) {
+      if (class_hint.res_class && strcmp(class_hint.res_class, "dmenu") == 0) {
+        XFree(class_hint.res_name);
+        XFree(class_hint.res_class);
+        XFree(children);
+        return 1;
+      }
+      if (class_hint.res_name)
+        XFree(class_hint.res_name);
+      if (class_hint.res_class)
+        XFree(class_hint.res_class);
+    }
+  }
+
+  if (children)
+    XFree(children);
+
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
   XWindowAttributes wa;
   int i, fast = 0;
@@ -925,6 +950,13 @@ int main(int argc, char *argv[]) {
     fputs("warning: no locale support\n", stderr);
   if (!(dpy = XOpenDisplay(NULL)))
     die("cannot open display");
+
+  if (is_dmenu_running(dpy)) {
+    fprintf(stderr, "dmenu is already running\n");
+    XCloseDisplay(dpy);
+    return 0;
+  }
+
   screen = DefaultScreen(dpy);
   root = RootWindow(dpy, screen);
   if (!embed || !(parentwin = strtol(embed, NULL, 0)))
